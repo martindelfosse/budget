@@ -58,6 +58,7 @@ header{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-betw
 h1{margin:0;font-size:34px}
 .sel{color:var(--a)}
 .navs{display:flex;gap:8px}
+.nav:disabled{opacity:.35;cursor:default}
 .chips{display:flex;gap:8px;overflow-x:auto;padding-bottom:4px}
 .chip{background:#fff;color:#16211F;box-shadow:inset 0 0 0 1px #D9D6CC}
 .chip.on{background:var(--a);color:#fff;box-shadow:none}
@@ -147,7 +148,13 @@ try{const r=JSON.parse(localStorage.getItem(KEY)||'null');if(r&&r.years){S.years
 if(!S.years)S.years={2027:{start:'0,00',months:twelve()}};
 {const d=new Date();if(S.years[d.getFullYear()]){S.year=d.getFullYear();S.mi=d.getMonth();}else S.year=+Object.keys(S.years)[0];}
 const persist=()=>{try{localStorage.setItem(KEY,JSON.stringify({v:2,years:S.years,ts:S.ts}));}catch(e){}};
-const save=()=>{S.ts=Date.now();persist();schedule();};
+let committed=JSON.stringify(S.years),undoStack=[],lastKey=null,lastT=0;
+const save=key=>{S.ts=Date.now();const now=JSON.stringify(S.years);
+  if(now!==committed){const merge=key&&key===lastKey&&Date.now()-lastT<2500;if(!merge){undoStack.push(committed);if(undoStack.length>50)undoStack.shift();}committed=now;}
+  lastKey=key||null;lastT=Date.now();persist();schedule();updUndo();};
+function updUndo(){const u=$('#undo');if(u)u.disabled=!undoStack.length;}
+function undo(){if(!undoStack.length)return;const prev=undoStack.pop();S.years=JSON.parse(prev);committed=prev;lastKey=null;if(!S.years[S.year]){S.year=+Object.keys(S.years)[0];S.mi=0;}S.ts=Date.now();persist();schedule();render();}
+function eachFrom(fn){fn(mon());for(let j=S.mi+1;j<12;j++)fn(cur().months[j]);Object.keys(S.years).forEach(y=>{if(+y>S.year)S.years[y].months.forEach(fn);});}
 const cur=()=>S.years[S.year],mon=()=>cur().months[S.mi];
 const find=(k,c,id)=>(c?mon().pon[c]:mon()[k]).find(x=>x.id===id);
 const ctx=r=>({k:r.dataset.k||null,c:r.dataset.c||null,id:r.dataset.id});
@@ -161,13 +168,13 @@ function setAmt(k,c,id,v){const x=find(k,c,id);if(!x)return;x.amount=v;if(c)retu
 function row(k,c,l){const {ym,last}=ymInfo(),d=dOf(l),lbl=d?(+d.slice(8,10))+' '+FRS[+d.slice(5,7)-1]:'Date';
   return `<div class="row${l.paid?'':' unp'}" data-k="${k||''}" data-c="${c||''}" data-id="${l.id}"><div class="grip" title="Glisser pour réorganiser" draggable="true">${DOTS}</div><input class="cb" type="checkbox" data-f="paid" aria-label="Payé"${l.paid?' checked':''}><input class="in lbl" data-f="label" aria-label="Libellé" placeholder="Libellé" value="${esc(l.label)}"><div class="dtw"><span aria-hidden="true">${lbl}</span><input type="date" data-f="date" aria-label="Date" min="${ym}-01" max="${ym}-${pad(last)}" value="${d}"></div><div class="aw"><input class="in amt" data-f="amount" aria-label="Montant" inputmode="decimal" placeholder="0,00" value="${esc(fixA(l.amount)||l.amount)}"><span aria-hidden="true">€</span></div><button class="x" data-a="del" aria-label="Supprimer la ligne">${XI}</button></div>`;}
 function render(){const m=mon(),cs=['Précédent','Suivant'];
-  $('#app').innerHTML=`<header><div><div class="eb">Budget</div><div class="ti"><h1>${FR[S.mi]}</h1><select class="sel" id="ys" aria-label="Année">${YEARS.map(y=>`<option${y===S.year?' selected':''}>${y}</option>`).join('')}</select></div></div><div class="navs"><button class="nav" data-a="prev" aria-label="Mois précédent">${CH('M15 6l-6 6 6 6')}</button><button class="nav" data-a="next" aria-label="Mois suivant">${CH('M9 6l6 6-6 6')}</button></div></header>
+  $('#app').innerHTML=`<header><div><div class="eb">Budget</div><div class="ti"><h1>${FR[S.mi]}</h1><select class="sel" id="ys" aria-label="Année">${YEARS.map(y=>`<option${y===S.year?' selected':''}>${y}</option>`).join('')}</select></div></div><div class="navs"><button class="nav" id="undo" data-a="undo" aria-label="Annuler la dernière action" title="Annuler" disabled><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#16211F" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 14L4 9l5-5"/><path d="M4 9h10a6 6 0 010 12h-3"/></svg></button><button class="nav" data-a="prev" aria-label="Mois précédent">${CH('M15 6l-6 6 6 6')}</button><button class="nav" data-a="next" aria-label="Mois suivant">${CH('M9 6l6 6-6 6')}</button></div></header>
 <nav class="chips">${FR.map((n,i)=>`<button class="chip${i===S.mi?' on':''}" data-a="month" data-i="${i}">${n.slice(0,4)+(n.length>4?'.':'')}</button>`).join('')}</nav>
 <section class="hero" id="hero"><div><div class="hl">État du compte</div><div class="big" data-b="etat"></div></div><div class="stats">${[0,1,2,3,4].map(i=>`<div><div class="sl" data-b="sl${i}"></div><div class="sv" data-b="sv${i}"></div></div>`).join('')}</div>${S.mi===0?`<div class="sb"><label>Solde reporté de l’année précédente (€) <input class="in sin" data-f="start" inputmode="decimal" value="${esc(cur().start)}"></label>${S.years[S.year-1]?'<button class="add wb" data-a="carry" data-b="carry"></button>':''}</div>`:''}</section>
 <div class="secs">${SECS.map(s=>`<section class="card sec"><div class="sh"><h2>${s[1]}</h2><div class="tr"><div class="tot" data-b="t-${s[0]}"></div><div class="sub" data-b="p-${s[0]}"></div></div></div>${m[s[0]].map(l=>row(s[0],null,l)).join('')}<button class="add2" data-a="addLine" data-k="${s[0]}">+ Ajouter une ligne</button></section>`).join('')}</div>
 <section class="card"><div class="sh"><h2>Dépenses ponctuelles</h2><div class="tot" data-b="t-pon"></div></div><div class="cats">${CATS.map(c=>`<div class="cat"><div class="ch"><strong>${c}</strong><span class="tot" data-b="t-c-${c}"></span></div>${m.pon[c].map(l=>row(null,c,l)).join('')}<div class="frm" data-c="${c}"><input class="in dl" data-d="L" aria-label="Libellé de la dépense" placeholder="Libellé"><input class="in da" data-d="A" aria-label="Montant" inputmode="decimal" placeholder="€"><button class="add" data-a="addPon">Ajouter</button></div></div>`).join('')}</div></section>
 ${syncHtml()}`;
-  refresh();}
+  refresh();updUndo();}
 function refresh(){const Y=cur(),r=calcYear(Y)[S.mi],m=mon(),B={etat:fmt(r.etat)};
   [[S.mi===0?'Solde reporté':'Reste du mois précédent',r.delta],['Revenus totaux',r.revTot],['Dépenses payées',r.dep],['Dépenses en attente',r.pend],['Disponible après attente',r.etat-r.pend]].forEach((x,i)=>{B['sl'+i]=x[0];B['sv'+i]=fmt(x[1]);});
   SECS.forEach(s=>{const a=m[s[0]],p=sum(a,false);B['t-'+s[0]]=fmt(sum(a,true));B['p-'+s[0]]=p>0?fmt(p)+' en attente':'';});
@@ -186,7 +193,7 @@ async function token(){if(!sess)throw new Error('Non connecté.');if(sess.exp-60
 async function rest(path,opt){const t=await token();return fetch(SB.url+'/rest/v1/'+path,Object.assign({},opt,{headers:Object.assign({apikey:SB.key,Authorization:'Bearer '+t,'Content-Type':'application/json'},opt&&opt.headers)}));}
 async function push(){const r=await rest('budget?on_conflict=user_id',{method:'POST',headers:{Prefer:'resolution=merge-duplicates,return=minimal'},body:JSON.stringify({user_id:sess.uid,data:{v:2,years:S.years},ts:S.ts})});if(!r.ok)throw new Error('Envoi impossible ('+r.status+').');lastSync=S.ts;localStorage.setItem('budget-last',lastSync);}
 function applyRemote(rem){const d=rem.data;if(!d||!d.years)return;const a=document.activeElement;if(a&&a.closest&&a.closest('#app')&&/INPUT|SELECT/.test(a.tagName)&&a.type!=='checkbox')return;
-  S.years=d.years;S.ts=+rem.ts;lastSync=S.ts;localStorage.setItem('budget-last',lastSync);if(!S.years[S.year]){S.year=+Object.keys(S.years)[0];S.mi=0;}persist();render();}
+  S.years=d.years;committed=JSON.stringify(S.years);undoStack=[];S.ts=+rem.ts;lastSync=S.ts;localStorage.setItem('budget-last',lastSync);if(!S.years[S.year]){S.year=+Object.keys(S.years)[0];S.mi=0;}persist();render();}
 async function sync(){if(!SBON||!sess)return;if(busy){schedule();return;}busy=true;
   try{setSync('Synchronisation…');const r=await rest('budget?select=data,ts&limit=1');if(!r.ok)throw new Error('Lecture impossible ('+r.status+').');const rem=(await r.json())[0];
     if(!rem)await push();
@@ -210,8 +217,13 @@ root.addEventListener('click',e=>{const b=e.target.closest('[data-a]');if(!b)ret
   if(a==='prev'){S.mi=Math.max(0,S.mi-1);render();}
   else if(a==='next'){S.mi=Math.min(11,S.mi+1);render();}
   else if(a==='month'){S.mi=+b.dataset.i;render();}
-  else if(a==='del'){const x=ctx(r),arr=x.c?mon().pon[x.c]:mon()[x.k];arr.splice(arr.findIndex(y=>y.id===x.id),1);save();render();}
-  else if(a==='addLine'){mon()[b.dataset.k].push({id:uid(),day:'',date:'',label:'',amount:'',paid:false});save();render();}
+  else if(a==='del'){const x=ctx(r);
+    if(x.c){const arr=mon().pon[x.c];arr.splice(arr.findIndex(y=>y.id===x.id),1);}
+    else{const c0=find(x.k,null,x.id),lb=((c0&&c0.label)||'').trim().toLowerCase();
+      eachFrom(mo=>{const g=mo[x.k];let i=g.findIndex(y=>y.id===x.id);if(i<0&&lb)i=g.findIndex(y=>(y.label||'').trim().toLowerCase()===lb);if(i>=0)g.splice(i,1);});}
+    save();render();}
+  else if(a==='addLine'){const k=b.dataset.k,id=uid();eachFrom(mo=>{mo[k].push({id:id,day:'',date:'',label:'',amount:'',paid:false});});save();render();}
+  else if(a==='undo')undo();
   else if(a==='addPon')addPon(b.closest('.frm'));
   else if(a==='carry'){cur().start=fixA(calcYear(S.years[S.year-1])[11].etat)||'0,00';save();render();}
   else if(a==='export'){const bl=new Blob([JSON.stringify({v:2,years:S.years})],{type:'application/json'}),l=document.createElement('a');l.href=URL.createObjectURL(bl);l.download='budget.json';l.click();}
@@ -221,9 +233,9 @@ root.addEventListener('click',e=>{const b=e.target.closest('[data-a]');if(!b)ret
   else if(a==='logout'){sess=null;localStorage.removeItem('budget-sess');setSync('');render();}
   else if(a==='import')$('#imp').click();});
 root.addEventListener('input',e=>{const t=e.target,f=t.dataset.f,r=t.closest('.row');
-  if(f==='amount'){const v=nrm(t.value);if(v!==t.value)t.value=v;const x=ctx(r);setAmt(x.k,x.c,x.id,v);refresh();save();}
-  else if(f==='label'){const x=ctx(r),o=find(x.k,x.c,x.id);if(o){o.label=t.value;save();}}
-  else if(f==='start'){const v=nrm(t.value);if(v!==t.value)t.value=v;cur().start=v;refresh();save();}
+  if(f==='amount'){const v=nrm(t.value);if(v!==t.value)t.value=v;const x=ctx(r);setAmt(x.k,x.c,x.id,v);refresh();save('a'+x.id);}
+  else if(f==='label'){const x=ctx(r),o=find(x.k,x.c,x.id);if(o){o.label=t.value;save('l'+x.id);}}
+  else if(f==='start'){const v=nrm(t.value);if(v!==t.value)t.value=v;cur().start=v;refresh();save('s');}
   else if(t.dataset.d==='A'){const v=nrm(t.value);if(v!==t.value)t.value=v;}});
 root.addEventListener('change',e=>{const t=e.target,f=t.dataset.f,r=t.closest('.row');
   if(t.id==='ys'){const y=+t.value;if(!S.years[y])S.years[y]=newYear(y);S.year=y;save();render();}
@@ -231,8 +243,8 @@ root.addEventListener('change',e=>{const t=e.target,f=t.dataset.f,r=t.closest('.
   else if(f==='date'){const x=ctx(r),o=find(x.k,x.c,x.id);if(o){o.date=t.value;o.day=t.value?String(+t.value.slice(8,10)):'';save();render();}}});
 root.addEventListener('focusin',e=>{const t=e.target;if(t.dataset.f==='amount'||t.dataset.f==='start'){setTimeout(()=>{try{t.select();}catch(x){}},0);}});
 root.addEventListener('focusout',e=>{const t=e.target,f=t.dataset.f;
-  if(f==='amount'){const v=fixA(t.value);t.value=v;const x=ctx(t.closest('.row'));setAmt(x.k,x.c,x.id,v);refresh();save();}
-  else if(f==='start'){const v=fixA(t.value)||'0,00';t.value=v;cur().start=v;refresh();save();}});
+  if(f==='amount'){const v=fixA(t.value);t.value=v;const x=ctx(t.closest('.row'));setAmt(x.k,x.c,x.id,v);refresh();save('a'+x.id);}
+  else if(f==='start'){const v=fixA(t.value)||'0,00';t.value=v;cur().start=v;refresh();save('s');}});
 root.addEventListener('keydown',e=>{if(e.key!=='Enter')return;const t=e.target;
   if(t.dataset.f==='amount'||t.dataset.f==='label'||t.dataset.f==='start'){e.preventDefault();t.blur();}
   else if(t.dataset.d){e.preventDefault();addPon(t.closest('.frm'));}
@@ -249,6 +261,7 @@ render();
 if(sess)sync();
 document.addEventListener('visibilitychange',()=>{if(!document.hidden)sync();});
 window.addEventListener('online',sync);
+document.addEventListener('keydown',e=>{if((e.metaKey||e.ctrlKey)&&!e.shiftKey&&e.key.toLowerCase()==='z'){const t=e.target;if(t&&/INPUT|TEXTAREA|SELECT/.test(t.tagName)&&t.type!=='checkbox')return;e.preventDefault();undo();}});
 if('serviceWorker' in navigator)navigator.serviceWorker.register('sw.js').catch(()=>{});
 
 </script>
