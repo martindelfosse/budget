@@ -2,7 +2,7 @@
 <html lang="fr">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,viewport-fit=cover">
 <title>Budget</title>
 <meta name="theme-color" content="#1001ee">
 <meta name="apple-mobile-web-app-capable" content="yes">
@@ -44,6 +44,8 @@ h2{margin:0;font-size:18px}
 .frm{flex-wrap:nowrap !important}
 }
 
+*{scrollbar-width:none;-ms-overflow-style:none}
+*::-webkit-scrollbar{display:none;width:0;height:0}
 :root{--a:#1001ee;--ab:#1001ee}
 .nav{color:#16211F}
 .sh[data-a]{cursor:pointer;user-select:none;-webkit-user-select:none}
@@ -217,10 +219,10 @@ ${syncHtml()}`;
   refresh();updUndo();centerChip(!!oldNav);}
 let navAnim=0;
 function animScroll(nav,to){cancelAnimationFrame(navAnim);const from=nav.scrollLeft,t0=performance.now(),dur=320;const step=t=>{const k=Math.min(1,(t-t0)/dur),e=k<.5?2*k*k:1-Math.pow(-2*k+2,2)/2;nav.scrollLeft=from+(to-from)*e;if(k<1)navAnim=requestAnimationFrame(step);};navAnim=requestAnimationFrame(step);}
-function centerChip(smooth){const on=document.querySelector('.chip.on'),nav=on&&on.parentElement;if(!nav)return;const nr=nav.getBoundingClientRect(),cr=on.getBoundingClientRect();
-  if(!smooth){nav.scrollLeft+=cr.left-nr.left-(nav.clientWidth-on.offsetWidth)/2;return;}
-  const pad=28;let d=0;if(cr.left<nr.left+pad)d=cr.left-nr.left-pad;else if(cr.right>nr.right-pad)d=cr.right-nr.right+pad;
-  if(!d)return;let rm=false;try{rm=matchMedia('(prefers-reduced-motion: reduce)').matches;}catch(e){}
+function centerChip(smooth){const on=document.querySelector('.chip.on'),nav=on&&on.parentElement;if(!nav)return;
+  const d=on.getBoundingClientRect().left-nav.getBoundingClientRect().left-(nav.clientWidth-on.offsetWidth)/2;
+  if(!smooth||Math.abs(d)<1){nav.scrollLeft+=d;return;}
+  let rm=false;try{rm=matchMedia('(prefers-reduced-motion: reduce)').matches;}catch(e){}
   if(rm)nav.scrollLeft+=d;else animScroll(nav,nav.scrollLeft+d);}
 function refresh(){const Y=cur(),r=calcYear(Y)[S.mi],m=mon(),B={etat:fmt(r.etat)};
   [[S.mi===0?'Solde reporté':'Reste du mois précédent',r.delta],['Revenus totaux',r.revTot],['Dépenses payées',r.dep],['Dépenses en attente',r.pend],['Disponible après attente',r.etat-r.pend]].forEach((x,i)=>{B['sl'+i]=x[0];B['sv'+i]=fmt(x[1]);});
@@ -298,6 +300,9 @@ root.addEventListener('focusout',e=>{const t=e.target,f=t.dataset.f;
   else if(f==='start'){const v=fixA(t.value)||'0,00';t.value=v;cur().start=v;refresh();save('s');}
   else if(t.dataset.q==='A'){const v=fixA(t.value);t.value=v;S.qA=v;}});
 root.addEventListener('keydown',e=>{const f0=e.target;if((e.key==='Enter'||e.key===' ')&&f0.dataset&&f0.dataset.a==='fold'){e.preventDefault();toggleFold(f0);return;}if(e.key!=='Enter')return;const t=e.target;
+  if(t.dataset.q==='L'){e.preventDefault();const n=root.querySelector('.qa');if(n)n.focus();return;}
+  if(t.dataset.d==='L'){e.preventDefault();const n=t.closest('.frm').querySelector('[data-d=A]');if(n)n.focus();return;}
+  if(t.dataset.f==='label'){e.preventDefault();const n=t.closest('.row').querySelector('[data-f=amount]');if(n)n.focus();return;}
   if(t.dataset.f==='amount'||t.dataset.f==='label'||t.dataset.f==='start'){e.preventDefault();t.blur();}
   else if(t.dataset.d){e.preventDefault();addPon(t.closest('.frm'));}
   else if(t.dataset.q){e.preventDefault();qAdd();}
