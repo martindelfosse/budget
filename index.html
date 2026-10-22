@@ -80,6 +80,7 @@ h1{margin:0;font-size:34px}
 .wb{background:#fff;color:#16211F}
 .secs{display:flex;flex-wrap:wrap;gap:20px;align-items:flex-start}
 .sec{flex:1 1 480px;min-width:0}
+@media (min-width:1000px){.secs{display:block;column-count:2;column-gap:20px}.secs .sec{break-inside:avoid;-webkit-column-break-inside:avoid;page-break-inside:avoid;margin-bottom:20px}}
 .sh{display:flex;justify-content:space-between;align-items:baseline;gap:8px;margin-bottom:8px}
 .tr{text-align:right}
 .tot{font-weight:700;color:var(--a);font-variant-numeric:tabular-nums}
