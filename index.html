@@ -65,6 +65,7 @@ h1{margin:0;font-size:34px}
 .navs{display:flex;gap:8px}
 .nav:disabled{opacity:.35;cursor:default}
 .chip{transition:background-color .2s,color .2s,box-shadow .2s}
+@media (min-width:1000px){.chips{gap:6px}.chip{flex:1 1 auto;padding:10px;text-align:center}}
 .chips{display:flex;gap:8px;overflow-x:auto;padding-bottom:4px}
 .chip{background:#fff;color:#16211F;box-shadow:inset 0 0 0 1px #D9D6CC}
 .chip.on{background:var(--ab);color:#fff;box-shadow:none}
@@ -176,7 +177,7 @@ const calcYear=Y=>{let d=num(Y.start);return Y.months.map(m=>{const r=calcMonth(
 const movePhone=m=>{const nm=x=>(x.label||'').trim().toLowerCase();const i=m.abo.findIndex(x=>nm(x)==='téléphone'||nm(x)==='telephone');if(i<0)return;const t=m.abo.splice(i,1)[0];const j=m.chg.findIndex(x=>nm(x)==='internet');m.chg.splice(j<0?m.chg.length:j+1,0,t);};
 const fixMonth=m=>{SECS.forEach(s=>m[s[0]].forEach(l=>{l.amount=fixA(l.amount);}));CATS.forEach(c=>m.pon[c].forEach(l=>{l.amount=fixA(l.amount);}));};
 
-const BUILD='2026-10-28 · 5';
+const BUILD='2026-10-30 · 6';
 const KEY='budget27',YEARS=Array.from({length:10},(_,i)=>2026+i);
 const $=s=>document.querySelector(s),pad=n=>String(n).padStart(2,'0');
 const esc=v=>String(v).replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/</g,'&lt;');
@@ -186,7 +187,9 @@ const CH=d=>`<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke=
 let S={mi:0,year:2027,years:null,ts:0,fold:{},qcat:'Courses',qL:'',qA:'',qMsg:''},drag=null;
 try{const r=JSON.parse(localStorage.getItem(KEY)||'null');if(r&&r.years){S.years=r.years;S.ts=r.ts||0;migAll(S.years);}}catch(e){}
 if(!S.years)S.years={2027:{start:'0,00',months:twelve()}};
-{const d=new Date();if(S.years[d.getFullYear()]){S.year=d.getFullYear();S.mi=d.getMonth();}else S.year=+Object.keys(S.years)[0];}
+{let v=null;try{v=JSON.parse(localStorage.getItem('budget-view')||'null');}catch(e){}
+  if(v&&S.years[v.y]&&v.m>=0&&v.m<12){S.year=v.y;S.mi=v.m;}
+  else{const d=new Date();if(S.years[d.getFullYear()]){S.year=d.getFullYear();S.mi=d.getMonth();}else S.year=+Object.keys(S.years)[0];}}
 const persist=()=>{try{localStorage.setItem(KEY,JSON.stringify({v:2,years:S.years,ts:S.ts}));}catch(e){}};
 let committed=JSON.stringify(S.years),undoStack=[],lastKey=null,lastT=0;
 try{S.fold=JSON.parse(localStorage.getItem('budget-fold')||'{}')||{};}catch(e){S.fold={};}
@@ -211,7 +214,7 @@ function setAmt(k,c,id,v){const x=find(k,c,id);if(!x)return;x.amount=v;if(c)retu
   Object.keys(S.years).forEach(y=>{if(+y>S.year)S.years[y].months.forEach(mo=>hit(mo[k]));});}
 function row(k,c,l){
   return `<div class="row${l.paid?'':' unp'}" data-k="${k||''}" data-c="${c||''}" data-id="${l.id}"><div class="grip" title="Glisser pour réorganiser" draggable="true">${DOTS}</div><input class="cb" type="checkbox" data-f="paid" aria-label="Payé"${l.paid?' checked':''}><input class="in lbl" data-f="label" aria-label="Intitulé" enterkeyhint="next" value="${esc(l.label)}"><div class="aw"><input class="in amt" data-f="amount" aria-label="Montant" enterkeyhint="done" inputmode="decimal" placeholder="0,00" value="${esc(fixA(l.amount)||l.amount)}"><span aria-hidden="true">€</span></div><button class="x" data-a="del" aria-label="Supprimer la ligne">${XI}</button></div>`;}
-function render(){const oldNav=document.querySelector('.chips'),oldLeft=oldNav?oldNav.scrollLeft:0,m=mon();
+function render(){try{localStorage.setItem('budget-view',JSON.stringify({y:S.year,m:S.mi}));}catch(e){}const oldNav=document.querySelector('.chips'),oldLeft=oldNav?oldNav.scrollLeft:0,m=mon();
   $('#app').innerHTML=`<header><div><div class="eb">Budget</div><div class="ti"><h1>${FR[S.mi]}</h1><select class="sel" id="ys" aria-label="Année">${YEARS.map(y=>`<option${y===S.year?' selected':''}>${y}</option>`).join('')}</select></div></div><div class="navs"><button class="nav" id="theme" data-a="theme" aria-label="${document.documentElement.dataset.theme==='dark'?'Passer en mode clair':'Passer en mode sombre'}" title="Mode sombre">${themeIcon()}</button><button class="nav" id="undo" data-a="undo" aria-label="Annuler la dernière action" title="Annuler" disabled><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 14L4 9l5-5"/><path d="M4 9h10a6 6 0 010 12h-3"/></svg></button></div></header>
 <nav class="chips">${FR.map((n,i)=>`<button class="chip${i===S.mi?' on':''}" data-a="month" data-i="${i}">${n}</button>`).join('')}</nav>
 <section class="hero" id="hero"><div><div class="hl">État du compte</div><div class="big" data-b="etat"></div></div><div class="stats">${[0,1,2,3,4].map(i=>`<div><div class="sl" data-b="sl${i}"></div><div class="sv" data-b="sv${i}"></div></div>`).join('')}</div>${S.mi===0?`<div class="sb"><label>Solde reporté de l’année précédente (€) <input class="in sin" data-f="start" inputmode="decimal" value="${esc(cur().start)}"></label>${S.years[S.year-1]?'<button class="add wb" data-a="carry" data-b="carry"></button>':''}</div>`:''}</section>
@@ -224,6 +227,7 @@ ${syncHtml()}<div class="ver">Version ${BUILD}</div>`;
 let navAnim=0;
 function animScroll(nav,to){cancelAnimationFrame(navAnim);const from=nav.scrollLeft,t0=performance.now(),dur=320;const step=t=>{const k=Math.min(1,(t-t0)/dur),e=k<.5?2*k*k:1-Math.pow(-2*k+2,2)/2;nav.scrollLeft=from+(to-from)*e;if(k<1)navAnim=requestAnimationFrame(step);};navAnim=requestAnimationFrame(step);}
 function centerChip(smooth){const on=document.querySelector('.chip.on'),nav=on&&on.parentElement;if(!nav)return;
+  if(nav.scrollWidth<=nav.clientWidth+1){nav.scrollLeft=0;return;}
   const d=on.getBoundingClientRect().left-nav.getBoundingClientRect().left-(nav.clientWidth-on.offsetWidth)/2;
   if(!smooth||Math.abs(d)<1){nav.scrollLeft+=d;return;}
   let rm=false;try{rm=matchMedia('(prefers-reduced-motion: reduce)').matches;}catch(e){}
